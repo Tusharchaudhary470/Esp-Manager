@@ -1,14 +1,15 @@
 const mongoose = require('mongoose')
 
 const transactionSchema = new mongoose.Schema({
-  type: { type: String, enum: ['deposit', 'withdraw', 'lobby'], required: true },
-  amount: { type: Number, default : 0},
+  type: { type: String, enum: ['deposit', 'withdraw', 'lobby', 'payout'], required: true },
+  amount: { type: Number, default: 0 },
   description: { type: String },
   performedBy: { type: String },
-  date: { type: Date, default: Date.now },
   entryFee: { type: Number, default: 0 },
-profit: { type: Number, default: 0 },
-status: { type: String, enum: ['pending', 'completed'], default: 'pending' }
+  profit: { type: Number, default: 0 },
+  status: { type: String, enum: ['pending', 'completed'], default: 'pending' },
+  paidTo: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  date: { type: Date, default: Date.now }
 })
 
 const tournamentSchema = new mongoose.Schema({
@@ -21,7 +22,7 @@ const tournamentSchema = new mongoose.Schema({
 const teamSchema = new mongoose.Schema({
   name: { type: String, required: true },
   code: { type: String, required: true, unique: true },
-  members: [{ type: String }],
+  members: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
   balance: { type: Number, default: 0 },
   transactions: [transactionSchema],
   tournaments: [tournamentSchema]
@@ -30,3 +31,6 @@ const teamSchema = new mongoose.Schema({
 const Team = mongoose.model('Team', teamSchema)
 
 module.exports = Team
+
+
+

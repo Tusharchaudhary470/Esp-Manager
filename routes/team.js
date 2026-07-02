@@ -6,30 +6,36 @@ const authMiddleware = require('../middleware/auth')
 // Create team
 router.post('/create', authMiddleware, async (req, res) => {
   try {
-    const { name } = req.body
-    const code = Math.random().toString(36).substring(2, 7).toUpperCase()
+    const { name } = req.body;
+    const code = Math.random().toString(36).substring(2, 7).toUpperCase();
 
     const team = new Team({
       name,
       code,
-      members: [req.userId]
-    })
+      // Change this line:
+      members: [{ 
+        user: req.userId, 
+        role: 'admin' // Add default role or any other field from your memberSchema
+      }]
+    });
 
-    await team.save()
+    await team.save();
 
-    res.json({ message: 'Team created', team })
+    res.json({ message: 'Team created', team });
   } catch (err) {
-    res.status(500).json({ message: err.message })
+    console.error(err); // Good for debugging
+    res.status(500).json({ message: err.message });
   }
-})
+});
 
 router.post('/join', authMiddleware, async (req ,res)=>{
     try {
         const { code } = req.body
-        const team = await Team.findOne({
-        "code": code
-    });
+        const team = await Team.findOne({ "code": code })
     if (!team) return res.status(404).json({ message: 'Team not found' })
+    if (team.members.includes(req.userId)) {
+    return res.status(400).json({ message: 'You are already in this team' })
+    }
     team.members.push(req.userId)
     await team.save();
     res.json({message: "successfully joined " + team.name})
@@ -47,7 +53,7 @@ try {
             "_id": teamId
         });
         if (!team) return res.status(404).json({ message: 'Team not found' })
-        team.balance = team.balance + amount;
+        team.balance = team.balance + Number(amount);
         team.transactions.push({
         type: 'deposit',
         amount: amount,
@@ -57,10 +63,12 @@ try {
         })
         await team.save();
         res.json({Balance: team.balance})
+        console.log(res)
 } catch (error) {
     res.json({message: error.message})
 }
 })
+
 
 router.post('/withdraw', authMiddleware, async (req, res)=>{
    
@@ -113,15 +121,45 @@ catch(err){
 }
 })
 
-router.put('/lobby/:transactionId', authMiddleware, async (req, res)=>{
+router.delete('/:transactionId', authMiddleware, async (req, res)=>{
     try {
-        const {teamId, profit, entryFee}= req.body;
+        const {teamId}= req.body;
         const { transactionId } = req.params;
         const team = await Team.findOne({
                 "_id": teamId
             });
             if (!team) return res.status(404).json({ message: 'Team not found' })
         const transaction = team.transactions.id(transactionId)
+        if(transaction.type === "deposit")
+        {team.balance = team.balance - transaction.amount
+        }
+        else if(transaction.type === "withdraw"){
+            team.balance = team.balance + transaction.amount
+             
+        }else if(transaction.type === "lobby" && transaction.status === "completed"){
+            team.balance = team.balance - ((transaction.profit || 0) - (transaction.entryFee || 0))
+             
+        }
+        team.transactions = team.transactions.filter(t => t._id.toString() !== transactionId)
+        await team.save();
+    
+        res.json({Balance: team.balance})
+    } catch (error) {
+        res.json({message: error.message})
+    }
+})
+
+router.put('/lobby/:transactionId', authMiddleware, async (req, res)=>{
+    try {
+        const {teamId, profit, entryFee}= req.body;
+        const { transactionId } = req.params;
+        console.log('teamId:', teamId, 'transactionId:', transactionId, 'profit:', profit, 'entryFee:', entryFee)
+        const team = await Team.findOne({
+                "_id": teamId
+            });
+            if (!team) return res.status(404).json({ message: 'Team not found' })
+        const transaction = team.transactions.id(transactionId)
+        console.log('found transaction:', transaction)
         transaction.profit = profit;
         transaction.status = 'completed'
         transaction.entryFee = entryFee;
@@ -131,6 +169,7 @@ router.put('/lobby/:transactionId', authMiddleware, async (req, res)=>{
     
         res.json({Balance: team.balance})
     } catch (error) {
+        console.log('ERROR:', error.message)
         res.json({message: error.message})
     }
 })
@@ -154,9 +193,9 @@ router.post('/tournaments', authMiddleware, async (req, res)=>{
     }
 })
 
-router.put('/tournaments/:tournamentId', authMiddleware, async (req, res)=>{
+router.put('/tournaments/:tournamentId', authMiddleware, async (req, res )=>{
     try {
-        const {teamId, status}= req.body;
+        const {teamId, name, date, entryFee}= req.body;
         const { tournamentId } = req.params;
         const team = await Team.findOne({
                 "_id": teamId
@@ -164,7 +203,9 @@ router.put('/tournaments/:tournamentId', authMiddleware, async (req, res)=>{
             if (!team) return res.status(404).json({ message: 'Team not found' })
         const tournament = team.tournaments.id(tournamentId)
         
-        tournament.status = status
+        tournament.entryFee = entryFee
+        tournament.name = name
+        tournament.date = date
         await team.save();
     
         res.json({message: "Tournament saved"})
@@ -173,21 +214,66 @@ router.put('/tournaments/:tournamentId', authMiddleware, async (req, res)=>{
     }
 })
 
-router.get('/:teamId', authMiddleware, async (req, res)=>{
+router.delete('/tournaments/:tournamentId', authMiddleware, async (req, res )=>{
     try {
-        const {teamId} = req.params
+        const {teamId}= req.body;
+        const { tournamentId } = req.params;
         const team = await Team.findOne({
-            "_id": teamId
+                "_id": teamId
+            });
+            if (!team) return res.status(404).json({ message: 'Team not found' })
+        const tournament = team.tournaments.id(tournamentId)
+        team.tournaments = team.tournaments.filter(t => t._id.toString() !== tournamentId)
+        
+        await team.save();
+    
+        res.json({message: "Tournament saved"})
+    } catch (error) {
+        res.json({message: error.message})
+    }
+})
+
+router.post('/payout', authMiddleware, async (req, res)=>{
+    try {
+        const {teamId, amount, userId, description}= req.body;
+        const team = await Team.findOne({
+                "_id": teamId
+            });
+            if (!team) return res.status(404).json({ message: 'Team not found' })
+        if(amount > team.balance) return res.status(404).json({ message: 'Insufficient balance' })  
+            team.balance -= amount
+        team.transactions.push({
+        type: 'payout',
+        amount: amount,
+        paidTo: userId,
+        description: description,
+        performedBy: req.userId,
+        status: 'completed'
         })
-        res.json(team)
+
+        
+        await team.save();
+    
+        res.json({message: "Payout recorded"})
+    } catch (error) {
+        res.json({message: error.message})
+    }
+})
+
+router.get('/', authMiddleware, async (req, res)=>{
+    try {
+        
+        const teams = await Team.find({members: req.userId})
+        res.json(teams)
     } catch (error) {
        res.json({message: error.message}) 
     }
 })
-router.get('/', authMiddleware, async (req, res)=>{
+router.get('/:teamId', authMiddleware, async (req, res)=>{
     try {
-        const teams = await Team.find({members: req.userId})
-        res.json(teams)
+        const {teamId} = req.params
+        const team = await Team.findOne({ "_id": teamId }).populate('members', 'username')
+        res.json(team)
     } catch (error) {
        res.json({message: error.message}) 
     }
