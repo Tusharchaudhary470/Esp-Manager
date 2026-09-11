@@ -170,16 +170,29 @@ async function sendTournamentWebhook(team, tournament, actor = 'Captain', action
   const isEdit = action === 'updated';
   const prizePool = Number(tournament.entryFee || 0);
 
+  const fields = [
+    { name: '🏆 Tournament', value: tournament.name, inline: true },
+    { name: '📅 Date & Time', value: tournament.date || 'TBD', inline: true },
+    { name: '💎 Prize Pool', value: `₹${prizePool.toLocaleString('en-IN')}`, inline: true },
+    { name: '🛡️ Scheduled By', value: actorUsername, inline: true }
+  ];
+
+  if (Array.isArray(tournament.lineup) && tournament.lineup.length > 0) {
+    const starters = tournament.lineup.filter(p => p.role !== 'Substitute').map(p => p.playerName);
+    const subs = tournament.lineup.filter(p => p.role === 'Substitute').map(p => p.playerName);
+    const lineupParts = [];
+    if (starters.length > 0) lineupParts.push(`⭐ **Starters:** ${starters.join(', ')}`);
+    if (subs.length > 0) lineupParts.push(`🔄 **Substitutes:** ${subs.join(', ')}`);
+    if (lineupParts.length > 0) {
+      fields.push({ name: '👥 Squad Lineup', value: lineupParts.join('\n'), inline: false });
+    }
+  }
+
   const embed = {
     title: isEdit ? `🔄 Tournament Updated — ${team.name}` : `📅 Tournament Scheduled — ${team.name}`,
     description: `**${tournament.name}** has been ${isEdit ? 'updated' : 'added to the squad calendar'}.`,
     color: 0x8b5cf6, // Violet / Purple
-    fields: [
-      { name: '🏆 Tournament', value: tournament.name, inline: true },
-      { name: '📅 Date & Time', value: tournament.date || 'TBD', inline: true },
-      { name: '💎 Prize Pool', value: `₹${prizePool.toLocaleString('en-IN')}`, inline: true },
-      { name: '🛡️ Scheduled By', value: actorUsername, inline: true }
-    ]
+    fields
   };
 
   return postToDiscord(team.discordWebhookUrl, embed);

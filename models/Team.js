@@ -13,11 +13,18 @@ const transactionSchema = new mongoose.Schema({
   date: { type: Date, default: Date.now }
 });
 
+const tournamentLineupSchema = new mongoose.Schema({
+  playerName: { type: String, required: true },
+  role: { type: String, default: 'Starter' },
+  memberType: { type: String, enum: ['user', 'custom'], default: 'user' }
+}, { _id: false });
+
 const tournamentSchema = new mongoose.Schema({
   name: { type: String, required: true },
   date: { type: String },
   entryFee: { type: Number },
-  status: { type: String, enum: ['upcoming', 'completed'], default: 'upcoming' }
+  status: { type: String, enum: ['upcoming', 'completed'], default: 'upcoming' },
+  lineup: [tournamentLineupSchema]
 });
 
 const customMemberSchema = new mongoose.Schema({

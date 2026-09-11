@@ -5,7 +5,7 @@ const { sendTournamentWebhook } = require('../utils/discordWebhook');
 // Add new tournament to squad schedule
 exports.addTournament = async (req, res) => {
   try {
-    const { teamId, name, date, entryFee } = req.body;
+    const { teamId, name, date, entryFee, status, lineup } = req.body;
     const team = await Team.findOne({ _id: teamId });
     if (!team) return res.status(404).json({ message: 'Team not found' });
 
@@ -13,10 +13,14 @@ exports.addTournament = async (req, res) => {
       return res.status(403).json({ message: 'Only team captain or co-captains can schedule tournaments' });
     }
 
+    const cleanLineup = Array.isArray(lineup) ? lineup : [];
+
     team.tournaments.push({
       name,
       date,
-      entryFee: Number(entryFee || 0)
+      entryFee: Number(entryFee || 0),
+      status: status || 'upcoming',
+      lineup: cleanLineup
     });
 
     await team.save();
@@ -25,10 +29,11 @@ exports.addTournament = async (req, res) => {
     sendTournamentWebhook(team, {
       name,
       date,
-      entryFee: Number(entryFee || 0)
+      entryFee: Number(entryFee || 0),
+      lineup: cleanLineup
     }, req.userId, 'scheduled').catch(() => {});
 
-    res.json({ message: 'Tournament added Successfully  details ' });
+    res.json({ message: 'Tournament scheduled successfully!' });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -37,7 +42,7 @@ exports.addTournament = async (req, res) => {
 // Update tournament details
 exports.updateTournament = async (req, res) => {
   try {
-    const { teamId, name, date, entryFee } = req.body;
+    const { teamId, name, date, entryFee, status, lineup } = req.body;
     const { tournamentId } = req.params;
 
     const team = await Team.findOne({ _id: teamId });
@@ -53,6 +58,8 @@ exports.updateTournament = async (req, res) => {
     tournament.name = name;
     tournament.date = date;
     tournament.entryFee = Number(entryFee || 0);
+    if (status) tournament.status = status;
+    if (Array.isArray(lineup)) tournament.lineup = lineup;
 
     await team.save();
 
@@ -60,7 +67,8 @@ exports.updateTournament = async (req, res) => {
     sendTournamentWebhook(team, {
       name,
       date,
-      entryFee: Number(entryFee || 0)
+      entryFee: Number(entryFee || 0),
+      lineup: tournament.lineup || []
     }, req.userId, 'updated').catch(() => {});
 
     res.json({ message: 'Tournament saved' });
