@@ -1,5 +1,6 @@
 const Team = require('../models/Team');
 const { canWrite, isCaptain } = require('../middleware/permissions');
+const { isValidDiscordWebhook, sendTestWebhook } = require('../utils/discordWebhook');
 
 // Create a new team
 exports.createTeam = async (req, res) => {
@@ -325,10 +326,10 @@ exports.cancelJoinRequest = async (req, res) => {
   }
 };
 
-// Update squad settings (toggle autoApproveJoin)
+// Update squad settings (autoApproveJoin, discordWebhookUrl, webhookNotifications)
 exports.updateTeamSettings = async (req, res) => {
   try {
-    const { teamId, autoApproveJoin } = req.body;
+    const { teamId, autoApproveJoin, discordWebhookUrl, webhookNotifications } = req.body;
     const team = await Team.findOne({ _id: teamId });
     if (!team) return res.status(404).json({ message: 'Team not found' });
 
@@ -340,11 +341,60 @@ exports.updateTeamSettings = async (req, res) => {
       team.autoApproveJoin = Boolean(autoApproveJoin);
     }
 
+    if (discordWebhookUrl !== undefined) {
+      const trimmedUrl = (discordWebhookUrl || '').trim();
+      if (trimmedUrl && !isValidDiscordWebhook(trimmedUrl)) {
+        return res.status(400).json({ 
+          message: 'Invalid Discord Webhook URL. It must begin with https://discord.com/api/webhooks/...' 
+        });
+      }
+      team.discordWebhookUrl = trimmedUrl;
+    }
+
+    if (webhookNotifications !== undefined && typeof webhookNotifications === 'object') {
+      const current = team.webhookNotifications ? team.webhookNotifications.toObject() : {};
+      team.webhookNotifications = {
+        ...current,
+        ...webhookNotifications
+      };
+    }
+
     await team.save();
     res.json({
-      message: `Auto-approval ${team.autoApproveJoin ? 'enabled' : 'disabled'}`,
+      message: 'Squad settings updated successfully',
       team
     });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Test squad Discord webhook connectivity
+exports.testDiscordWebhook = async (req, res) => {
+  try {
+    const { teamId, webhookUrl } = req.body;
+    const team = await Team.findOne({ _id: teamId });
+    if (!team) return res.status(404).json({ message: 'Team not found' });
+
+    if (!canWrite(team, req.userId)) {
+      return res.status(403).json({ message: 'Only squad captain or co-captains can test webhook settings' });
+    }
+
+    const targetUrl = (webhookUrl || team.discordWebhookUrl || '').trim();
+    if (!isValidDiscordWebhook(targetUrl)) {
+      return res.status(400).json({ 
+        message: 'Invalid Discord Webhook URL. Must begin with https://discord.com/api/webhooks/...' 
+      });
+    }
+
+    const success = await sendTestWebhook(targetUrl, team.name);
+    if (!success) {
+      return res.status(502).json({ 
+        message: 'Failed to deliver test ping to Discord. Please check webhook URL channel permissions.' 
+      });
+    }
+
+    res.json({ message: 'Test ping delivered to Discord channel successfully!' });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

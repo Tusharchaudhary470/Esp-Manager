@@ -1,5 +1,6 @@
 const Team = require('../models/Team');
 const { canWrite } = require('../middleware/permissions');
+const { sendPayoutWebhook } = require('../utils/discordWebhook');
 
 // Record player payout from squad vault
 exports.recordPayout = async (req, res) => {
@@ -33,6 +34,14 @@ exports.recordPayout = async (req, res) => {
     });
 
     await team.save();
+
+    // Trigger asynchronous Discord alert
+    sendPayoutWebhook(team, {
+      amount: payoutAmount,
+      recipientName: recipientName || 'Squad Member',
+      description
+    }, req.userId).catch(() => {});
+
     res.json({ message: 'Payout recorded', Balance: team.balance });
   } catch (error) {
     res.status(500).json({ message: error.message });

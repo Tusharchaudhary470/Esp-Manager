@@ -50,6 +50,13 @@ const teamSchema = new mongoose.Schema({
   joinRequests: [joinRequestSchema],
   customMembers: [customMemberSchema],
   autoApproveJoin: { type: Boolean, default: false },
+  discordWebhookUrl: { type: String, default: '' },
+  webhookNotifications: {
+    matchResults: { type: Boolean, default: true },
+    payouts: { type: Boolean, default: true },
+    treasury: { type: Boolean, default: true },
+    tournaments: { type: Boolean, default: true }
+  },
   balance: { type: Number, default: 0 },
   transactions: [transactionSchema],
   tournaments: [tournamentSchema]

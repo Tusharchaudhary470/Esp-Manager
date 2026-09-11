@@ -1,5 +1,6 @@
 const Team = require('../models/Team');
 const { canWrite } = require('../middleware/permissions');
+const { sendTreasuryWebhook, sendMatchWebhook } = require('../utils/discordWebhook');
 
 // Deposit funds to team vault
 exports.deposit = async (req, res) => {
@@ -27,6 +28,14 @@ exports.deposit = async (req, res) => {
     });
 
     await team.save();
+
+    // Trigger asynchronous Discord alert
+    sendTreasuryWebhook(team, {
+      type: 'deposit',
+      amount: parsedAmount,
+      description: description ? description.trim() : 'Manual Deposit'
+    }, req.userId).catch(() => {});
+
     res.json({ Balance: team.balance });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -63,6 +72,14 @@ exports.withdraw = async (req, res) => {
     });
 
     await team.save();
+
+    // Trigger asynchronous Discord alert
+    sendTreasuryWebhook(team, {
+      type: 'withdraw',
+      amount: parsedAmount,
+      description: description ? description.trim() : 'Manual Withdrawal'
+    }, req.userId).catch(() => {});
+
     res.json({ Balance: team.balance });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -97,6 +114,14 @@ exports.recordLobby = async (req, res) => {
 
     team.balance = team.balance + ((Number(profit) || 0) - (Number(entryFee) || 0));
     await team.save();
+
+    // Trigger asynchronous Discord alert for completed match
+    sendMatchWebhook(team, {
+      entryFee: Number(entryFee || 0),
+      profit: Number(profit || 0),
+      description
+    }, req.userId).catch(() => {});
+
     res.json({ Balance: team.balance });
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -125,6 +150,13 @@ exports.settleLobby = async (req, res) => {
 
     team.balance = team.balance + (Number(profit) - Number(entryFee));
     await team.save();
+
+    // Trigger asynchronous Discord alert for settled match
+    sendMatchWebhook(team, {
+      entryFee: Number(entryFee || 0),
+      profit: Number(profit || 0),
+      description: transaction.description
+    }, req.userId).catch(() => {});
 
     res.json({ Balance: team.balance });
   } catch (error) {

@@ -1,5 +1,6 @@
 const Team = require('../models/Team');
 const { canWrite } = require('../middleware/permissions');
+const { sendTournamentWebhook } = require('../utils/discordWebhook');
 
 // Add new tournament to squad schedule
 exports.addTournament = async (req, res) => {
@@ -19,6 +20,14 @@ exports.addTournament = async (req, res) => {
     });
 
     await team.save();
+
+    // Trigger asynchronous Discord alert
+    sendTournamentWebhook(team, {
+      name,
+      date,
+      entryFee: Number(entryFee || 0)
+    }, req.userId, 'scheduled').catch(() => {});
+
     res.json({ message: 'Tournament added Successfully  details ' });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -46,6 +55,14 @@ exports.updateTournament = async (req, res) => {
     tournament.entryFee = Number(entryFee || 0);
 
     await team.save();
+
+    // Trigger asynchronous Discord alert
+    sendTournamentWebhook(team, {
+      name,
+      date,
+      entryFee: Number(entryFee || 0)
+    }, req.userId, 'updated').catch(() => {});
+
     res.json({ message: 'Tournament saved' });
   } catch (error) {
     res.status(500).json({ message: error.message });

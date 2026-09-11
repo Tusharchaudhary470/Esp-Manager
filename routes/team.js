@@ -14,6 +14,7 @@ const {
   getMyPendingRequests,
   cancelJoinRequest,
   updateTeamSettings,
+  testDiscordWebhook,
   leaveTeam,
   kickMember,
   getTeams,
@@ -46,6 +47,7 @@ router.post('/join', authMiddleware, joinTeam);
 router.get('/my-requests', authMiddleware, getMyPendingRequests);
 router.post('/cancel-request', authMiddleware, cancelJoinRequest);
 router.put('/settings', authMiddleware, updateTeamSettings);
+router.post('/webhook/test', authMiddleware, testDiscordWebhook);
 router.post('/leave', authMiddleware, leaveTeam);
 router.post('/kick', authMiddleware, kickMember);
 router.get('/', authMiddleware, getTeams);
