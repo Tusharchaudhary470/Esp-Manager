@@ -53,7 +53,7 @@ app.get('/health', (req, res) => {
 });
 
 app.get('/', (req, res) => {
-  res.send('FF Finance API running');
+  res.json({ status: 'ok', service: 'Rosterly Backend API', version: '1.0.0' });
 });
 
 // MongoDB connection with connection pool limit for Atlas free-tier safety
