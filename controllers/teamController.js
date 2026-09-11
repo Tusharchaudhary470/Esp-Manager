@@ -265,6 +265,15 @@ exports.getTeamById = async (req, res) => {
       .populate('joinRequests.user', 'username')
       .lean();
     if (!team) return res.status(404).json({ message: 'Team not found' });
+
+    // Check if authenticated user is actually an active member of this squad
+    const isMember = (team.members || []).some(
+      (m) => (m._id ? m._id.toString() : m.toString()) === req.userId.toString()
+    );
+    if (!isMember) {
+      return res.status(403).json({ message: 'Access denied: You are not a member of this squad' });
+    }
+
     res.json(team);
   } catch (error) {
     res.status(500).json({ message: error.message });
