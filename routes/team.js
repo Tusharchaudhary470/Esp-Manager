@@ -27,7 +27,8 @@ const {
   withdraw,
   recordLobby,
   settleLobby,
-  deleteTransaction
+  deleteTransaction,
+  editTransaction
 } = require('../controllers/walletController');
 
 const {
@@ -67,6 +68,7 @@ router.post('/deposit', authMiddleware, financialLimiter, deposit);
 router.post('/withdraw', authMiddleware, financialLimiter, withdraw);
 router.post('/lobby', authMiddleware, financialLimiter, recordLobby);
 router.put('/lobby/:transactionId', authMiddleware, settleLobby);
+router.put('/transaction/:transactionId', authMiddleware, financialLimiter, editTransaction);
 router.delete('/:transactionId', authMiddleware, deleteTransaction);
 
 // 4. Roster & Payout Operations

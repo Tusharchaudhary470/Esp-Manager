@@ -164,7 +164,7 @@ exports.settleLobby = async (req, res) => {
   }
 };
 
-// Delete transaction from team ledger
+// Delete transaction from team ledger (preserves current updated balance)
 exports.deleteTransaction = async (req, res) => {
   try {
     const { teamId } = req.body;
@@ -180,18 +180,85 @@ exports.deleteTransaction = async (req, res) => {
     const transaction = team.transactions.id(transactionId);
     if (!transaction) return res.status(404).json({ message: 'Transaction not found' });
 
-    if (transaction.type === 'deposit') {
-      team.balance = team.balance - transaction.amount;
-    } else if (transaction.type === 'withdraw') {
-      team.balance = team.balance + transaction.amount;
-    } else if (transaction.type === 'lobby' && transaction.status === 'completed') {
-      team.balance = team.balance - ((transaction.profit || 0) - (transaction.entryFee || 0));
-    }
-
+    // Remove transaction record from ledger WITHOUT altering vault balance
     team.transactions = team.transactions.filter((t) => t._id.toString() !== transactionId);
     await team.save();
 
-    res.json({ Balance: team.balance });
+    res.json({ message: 'Transaction record deleted', Balance: team.balance, transactions: team.transactions });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Edit an existing transaction record (adjusts balance only for the delta of amount corrections)
+exports.editTransaction = async (req, res) => {
+  try {
+    const { teamId, amount, description, entryFee, profit, status, recipientName } = req.body;
+    const { transactionId } = req.params;
+
+    const team = await Team.findOne({ _id: teamId });
+    if (!team) return res.status(404).json({ message: 'Team not found' });
+
+    if (!canWrite(team, req.userId)) {
+      return res.status(403).json({ message: 'Only team captain or co-captains can edit ledger transactions' });
+    }
+
+    const transaction = team.transactions.id(transactionId);
+    if (!transaction) return res.status(404).json({ message: 'Transaction not found' });
+
+    // Adjust balance based on the delta between previous and new values
+    if (transaction.type === 'deposit') {
+      if (amount !== undefined) {
+        const oldAmt = Number(transaction.amount || 0);
+        const newAmt = Number(amount);
+        if (!isNaN(newAmt) && newAmt >= 0) {
+          const delta = newAmt - oldAmt;
+          team.balance += delta;
+          transaction.amount = newAmt;
+        }
+      }
+    } else if (transaction.type === 'withdraw' || transaction.type === 'payout') {
+      if (amount !== undefined) {
+        const oldAmt = Number(transaction.amount || 0);
+        const newAmt = Number(amount);
+        if (!isNaN(newAmt) && newAmt >= 0) {
+          const delta = newAmt - oldAmt;
+          team.balance -= delta;
+          transaction.amount = newAmt;
+        }
+      }
+    } else if (transaction.type === 'lobby') {
+      const oldStatus = transaction.status;
+      const newStatus = status || oldStatus;
+      const oldEntry = Number(transaction.entryFee || 0);
+      const oldProfit = Number(transaction.profit || 0);
+      const newEntry = entryFee !== undefined ? Number(entryFee) : oldEntry;
+      const newProfitVal = profit !== undefined ? Number(profit) : oldProfit;
+
+      if (oldStatus === 'completed' && newStatus === 'completed') {
+        const oldNet = oldProfit - oldEntry;
+        const newNet = newProfitVal - newEntry;
+        team.balance += (newNet - oldNet);
+      } else if (oldStatus !== 'completed' && newStatus === 'completed') {
+        team.balance += (newProfitVal - newEntry);
+      } else if (oldStatus === 'completed' && newStatus !== 'completed') {
+        team.balance -= (oldProfit - oldEntry);
+      }
+
+      transaction.entryFee = newEntry;
+      transaction.profit = newProfitVal;
+      transaction.status = newStatus;
+    }
+
+    if (description !== undefined) {
+      transaction.description = description.trim();
+    }
+    if (recipientName !== undefined) {
+      transaction.recipientName = recipientName.trim();
+    }
+
+    await team.save();
+    res.json({ message: 'Transaction updated successfully', transaction, Balance: team.balance });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
