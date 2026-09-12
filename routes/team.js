@@ -17,6 +17,7 @@ const {
   testDiscordWebhook,
   leaveTeam,
   kickMember,
+  deleteTeam,
   getTeams,
   getTeamById
 } = require('../controllers/teamController');
@@ -50,6 +51,7 @@ router.put('/settings', authMiddleware, updateTeamSettings);
 router.post('/webhook/test', authMiddleware, testDiscordWebhook);
 router.post('/leave', authMiddleware, leaveTeam);
 router.post('/kick', authMiddleware, kickMember);
+router.delete('/:teamId/disband', authMiddleware, deleteTeam);
 router.get('/', authMiddleware, getTeams);
 router.get('/:teamId', authMiddleware, getTeamById);
 

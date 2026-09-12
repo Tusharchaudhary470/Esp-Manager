@@ -1,4 +1,5 @@
 const Team = require('../models/Team');
+const User = require('../models/User');
 const { canWrite, isCaptain } = require('../middleware/permissions');
 const { isValidDiscordWebhook, sendTestWebhook } = require('../utils/discordWebhook');
 
@@ -467,6 +468,29 @@ exports.kickMember = async (req, res) => {
 
     await team.save();
     res.json({ message: 'Member has been kicked from the squad', team });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Captain permanently disbands and deletes the squad
+exports.deleteTeam = async (req, res) => {
+  try {
+    const { teamId } = req.params;
+    const team = await Team.findById(teamId);
+    if (!team) return res.status(404).json({ message: 'Squad not found' });
+
+    if (!isCaptain(team, req.userId)) {
+      return res.status(403).json({ message: 'Only the squad captain can disband this squad' });
+    }
+
+    await Team.deleteOne({ _id: teamId });
+    await User.updateMany(
+      { teams: teamId },
+      { $pull: { teams: teamId } }
+    );
+
+    res.json({ message: `Squad "${team.name}" has been permanently disbanded.` });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
