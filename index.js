@@ -56,6 +56,21 @@ app.get('/', (req, res) => {
   res.json({ status: 'ok', service: 'Rosterly Backend API', version: '1.0.0' });
 });
 
+// 404 Catch-All for unknown API routes
+app.use((req, res) => {
+  res.status(404).json({ message: `API route not found: ${req.method} ${req.originalUrl}` });
+});
+
+// Global Fallback Error Handler Middleware
+// Catches unhandled pipeline errors, malformed JSON body errors, and unexpected exceptions
+app.use((err, req, res, next) => {
+  console.error('Unhandled server error:', err);
+  const status = err.status || err.statusCode || 500;
+  res.status(status).json({
+    message: err.message || 'Internal server error'
+  });
+});
+
 // MongoDB connection with connection pool limit for Atlas free-tier safety
 if (process.env.MONGODB_URI) {
   mongoose.connect(process.env.MONGODB_URI, {
