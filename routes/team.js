@@ -43,6 +43,13 @@ const {
   deleteTournament
 } = require('../controllers/tournamentController');
 
+const {
+  getStrategies,
+  createStrategy,
+  updateStrategy,
+  deleteStrategy
+} = require('../controllers/strategyController');
+
 // 1. Team Management & Details
 router.post('/create', authMiddleware, createTeam);
 router.post('/join', authMiddleware, joinTeam);
@@ -80,5 +87,11 @@ router.delete('/custom-members/:memberId', authMiddleware, removeCustomMember);
 router.post('/tournaments', authMiddleware, addTournament);
 router.put('/tournaments/:tournamentId', authMiddleware, updateTournament);
 router.delete('/tournaments/:tournamentId', authMiddleware, deleteTournament);
+
+// 6. Tactical Strategy Playbook Operations
+router.get('/:teamId/strategies', authMiddleware, getStrategies);
+router.post('/strategies', authMiddleware, createStrategy);
+router.put('/strategies/:strategyId', authMiddleware, updateStrategy);
+router.delete('/strategies/:strategyId', authMiddleware, deleteStrategy);
 
 module.exports = router;

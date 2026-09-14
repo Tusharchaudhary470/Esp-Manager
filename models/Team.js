@@ -47,6 +47,43 @@ const joinRequestSchema = new mongoose.Schema({
   date: { type: Date, default: Date.now }
 });
 
+const strategySlideSchema = new mongoose.Schema({
+  id: { type: String },
+  name: { type: String, default: 'Phase 1: Overview' },
+  mapImage: { type: String, default: null },
+  rotation: { type: Number, default: 0 },
+  zoomLevel: { type: Number, default: 1 },
+  panOffset: {
+    x: { type: Number, default: 0 },
+    y: { type: Number, default: 0 }
+  },
+  isCropped: { type: Boolean, default: false },
+  markers: [mongoose.Schema.Types.Mixed],
+  arrows: [mongoose.Schema.Types.Mixed],
+  zones: [mongoose.Schema.Types.Mixed],
+  labeledCircles: [mongoose.Schema.Types.Mixed],
+  pencilPaths: [mongoose.Schema.Types.Mixed],
+  textAnnotations: [mongoose.Schema.Types.Mixed]
+}, { _id: false });
+
+const strategySchema = new mongoose.Schema({
+  title: { type: String, required: true },
+  game: { type: String, default: 'Custom / Any Game' },
+  mapName: { type: String, required: true },
+  customImage: { type: String, default: null },
+  notes: { type: String, default: '' },
+  slides: [strategySlideSchema],
+  markers: [mongoose.Schema.Types.Mixed],
+  arrows: [mongoose.Schema.Types.Mixed],
+  zones: [mongoose.Schema.Types.Mixed],
+  labeledCircles: [mongoose.Schema.Types.Mixed],
+  pencilPaths: [mongoose.Schema.Types.Mixed],
+  textAnnotations: [mongoose.Schema.Types.Mixed],
+  createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now }
+});
+
 const teamSchema = new mongoose.Schema({
   name: { type: String, required: true },
   code: { type: String, required: true, unique: true },
@@ -66,7 +103,8 @@ const teamSchema = new mongoose.Schema({
   },
   balance: { type: Number, default: 0 },
   transactions: [transactionSchema],
-  tournaments: [tournamentSchema]
+  tournaments: [tournamentSchema],
+  strategies: [strategySchema]
 }, { timestamps: true });
 
 teamSchema.index({ members: 1 });
