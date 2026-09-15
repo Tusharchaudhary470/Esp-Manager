@@ -47,7 +47,8 @@ const {
   getStrategies,
   createStrategy,
   updateStrategy,
-  deleteStrategy
+  deleteStrategy,
+  getStrategyStatus
 } = require('../controllers/strategyController');
 
 // 1. Team Management & Details
@@ -89,6 +90,7 @@ router.put('/tournaments/:tournamentId', authMiddleware, updateTournament);
 router.delete('/tournaments/:tournamentId', authMiddleware, deleteTournament);
 
 // 6. Tactical Strategy Playbook Operations
+router.get('/strategies/status', getStrategyStatus);
 router.get('/:teamId/strategies', authMiddleware, getStrategies);
 router.post('/strategies', authMiddleware, createStrategy);
 router.put('/strategies/:strategyId', authMiddleware, updateStrategy);

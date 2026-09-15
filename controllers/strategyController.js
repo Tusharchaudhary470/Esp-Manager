@@ -1,5 +1,23 @@
-﻿const Team = require('../models/Team');
+const Team = require('../models/Team');
 const { canWrite } = require('../middleware/permissions');
+
+const isMaintenanceMode = () => process.env.STRATEGY_MAINTENANCE_MODE === 'true';
+
+const isProTeam = (team) => {
+  if (team.isPro) return true;
+  if (team.proExpiresAt && new Date(team.proExpiresAt) > new Date()) return true;
+  return false;
+};
+
+// Check maintenance status
+exports.getStrategyStatus = async (req, res) => {
+  res.json({
+    maintenance: isMaintenanceMode(),
+    message: isMaintenanceMode() 
+      ? 'Cloud strategy storage is temporarily under maintenance. You can still plan tactics and share via WhatsApp or PNG.' 
+      : 'Operational'
+  });
+};
 
 // Get all saved strategies for a squad
 exports.getStrategies = async (req, res) => {
@@ -26,6 +44,14 @@ exports.getStrategies = async (req, res) => {
 // Create a new strategy board
 exports.createStrategy = async (req, res) => {
   try {
+    // 1. Check emergency maintenance kill-switch
+    if (isMaintenanceMode()) {
+      return res.status(503).json({
+        message: 'Cloud strategy storage is temporarily in maintenance mode. You can still use the tactical board and share directly via WhatsApp or PNG export!',
+        code: 'MAINTENANCE_MODE'
+      });
+    }
+
     const {
       teamId,
       title,
@@ -54,6 +80,36 @@ exports.createStrategy = async (req, res) => {
     }
 
     if (!team.strategies) team.strategies = [];
+
+    // 2. Free Tier vs Pro Enforcement
+    const isPro = isProTeam(team);
+
+    if (!isPro) {
+      // Quota A: Max 1 saved playbook on Free tier
+      if (team.strategies.length >= 1) {
+        return res.status(403).json({
+          message: 'Free tier allows 1 active squad playbook. Upgrade to Rosterly Pro for unlimited playbooks, or update your existing strategy!',
+          code: 'PLAYBOOK_LIMIT_REACHED'
+        });
+      }
+
+      // Quota B: Max 3 multi-phase slides on Free tier
+      if (Array.isArray(slides) && slides.length > 3) {
+        return res.status(403).json({
+          message: 'Free tier allows up to 3 slides per playbook. Upgrade to Rosterly Pro for unlimited slides!',
+          code: 'SLIDE_LIMIT_REACHED'
+        });
+      }
+
+      // Quota C: Custom Map Screenshot Upload is Pro Only
+      const hasCustomMap = !!customImage || (Array.isArray(slides) && slides.some(s => !!s.mapImage));
+      if (hasCustomMap) {
+        return res.status(403).json({
+          message: 'Custom map screenshot upload is a Rosterly Pro feature. Upgrade to Pro to upload custom match screenshots!',
+          code: 'CUSTOM_MAP_PRO_ONLY'
+        });
+      }
+    }
 
     const newStrategy = {
       title: title.trim(),
@@ -91,6 +147,14 @@ exports.createStrategy = async (req, res) => {
 // Update an existing strategy board
 exports.updateStrategy = async (req, res) => {
   try {
+    // 1. Check emergency maintenance kill-switch
+    if (isMaintenanceMode()) {
+      return res.status(503).json({
+        message: 'Cloud strategy storage is temporarily in maintenance mode. You can still use the tactical board and share directly via WhatsApp or PNG export!',
+        code: 'MAINTENANCE_MODE'
+      });
+    }
+
     const { strategyId } = req.params;
     const {
       teamId,
@@ -117,6 +181,28 @@ exports.updateStrategy = async (req, res) => {
 
     const strat = team.strategies.id(strategyId);
     if (!strat) return res.status(404).json({ message: 'Strategy not found' });
+
+    // 2. Free Tier vs Pro Enforcement
+    const isPro = isProTeam(team);
+
+    if (!isPro) {
+      // Quota B: Max 3 multi-phase slides on Free tier
+      if (Array.isArray(slides) && slides.length > 3) {
+        return res.status(403).json({
+          message: 'Free tier allows up to 3 slides per playbook. Upgrade to Rosterly Pro for unlimited slides!',
+          code: 'SLIDE_LIMIT_REACHED'
+        });
+      }
+
+      // Quota C: Custom Map Screenshot Upload is Pro Only
+      const hasCustomMap = !!customImage || (Array.isArray(slides) && slides.some(s => !!s.mapImage));
+      if (hasCustomMap) {
+        return res.status(403).json({
+          message: 'Custom map screenshot upload is a Rosterly Pro feature. Upgrade to Pro to upload custom match screenshots!',
+          code: 'CUSTOM_MAP_PRO_ONLY'
+        });
+      }
+    }
 
     if (title) strat.title = title.trim();
     if (game) strat.game = game;

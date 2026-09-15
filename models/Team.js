@@ -104,7 +104,9 @@ const teamSchema = new mongoose.Schema({
   balance: { type: Number, default: 0 },
   transactions: [transactionSchema],
   tournaments: [tournamentSchema],
-  strategies: [strategySchema]
+  strategies: [strategySchema],
+  isPro: { type: Boolean, default: false },
+  proExpiresAt: { type: Date, default: null }
 }, { timestamps: true });
 
 teamSchema.index({ members: 1 });
