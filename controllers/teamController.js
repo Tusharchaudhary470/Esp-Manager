@@ -7,10 +7,29 @@ const { isValidDiscordWebhook, sendTestWebhook } = require('../utils/discordWebh
 exports.createTeam = async (req, res) => {
   try {
     const { name } = req.body;
+    if (!name || !name.trim()) {
+      return res.status(400).json({ message: 'Squad name is required' });
+    }
+
+    // Free Tier vs Pro Enforcement: Max 1 squad created as Captain
+    const user = await User.findById(req.userId);
+    const isProUser = (user && (user.isPro || (user.proExpiresAt && new Date(user.proExpiresAt) > new Date()))) ||
+      Boolean(await Team.exists({ captain: req.userId, isPro: true }));
+
+    if (!isProUser) {
+      const ownedTeamsCount = await Team.countDocuments({ captain: req.userId });
+      if (ownedTeamsCount >= 1) {
+        return res.status(403).json({
+          message: 'Free tier allows creating 1 squad as Captain. Upgrade to Rosterly Pro to create and manage multiple squads, or delete your existing squad.',
+          code: 'TEAM_LIMIT_REACHED'
+        });
+      }
+    }
+
     const code = Math.random().toString(36).substring(2, 7).toUpperCase();
 
     const team = new Team({
-      name,
+      name: name.trim(),
       code,
       captain: req.userId,
       admins: [],
@@ -20,7 +39,8 @@ exports.createTeam = async (req, res) => {
         role: 'IGL'
       }],
       joinRequests: [],
-      customMembers: []
+      customMembers: [],
+      isPro: isProUser || false
     });
 
     await team.save();
