@@ -93,20 +93,11 @@ exports.createStrategy = async (req, res) => {
         });
       }
 
-      // Quota B: Max 3 multi-phase slides on Free tier
-      if (Array.isArray(slides) && slides.length > 3) {
+      // Quota B: Max 1 slide on Free tier (multi-phase slides require Pro)
+      if (Array.isArray(slides) && slides.length > 1) {
         return res.status(403).json({
-          message: 'Free tier allows up to 3 slides per playbook. Upgrade to Rosterly Pro for unlimited slides!',
+          message: 'Free tier includes 1 tactical map slide. Upgrade to Rosterly Pro to add unlimited multi-phase slides!',
           code: 'SLIDE_LIMIT_REACHED'
-        });
-      }
-
-      // Quota C: Custom Map Screenshot Upload is Pro Only
-      const hasCustomMap = !!customImage || (Array.isArray(slides) && slides.some(s => !!s.mapImage));
-      if (hasCustomMap) {
-        return res.status(403).json({
-          message: 'Custom map screenshot upload is a Rosterly Pro feature. Upgrade to Pro to upload custom match screenshots!',
-          code: 'CUSTOM_MAP_PRO_ONLY'
         });
       }
     }
@@ -186,20 +177,11 @@ exports.updateStrategy = async (req, res) => {
     const isPro = isProTeam(team);
 
     if (!isPro) {
-      // Quota B: Max 3 multi-phase slides on Free tier
-      if (Array.isArray(slides) && slides.length > 3) {
+      // Quota B: Max 1 slide on Free tier (multi-phase slides require Pro)
+      if (Array.isArray(slides) && slides.length > 1) {
         return res.status(403).json({
-          message: 'Free tier allows up to 3 slides per playbook. Upgrade to Rosterly Pro for unlimited slides!',
+          message: 'Free tier includes 1 tactical map slide. Upgrade to Rosterly Pro to add unlimited multi-phase slides!',
           code: 'SLIDE_LIMIT_REACHED'
-        });
-      }
-
-      // Quota C: Custom Map Screenshot Upload is Pro Only
-      const hasCustomMap = !!customImage || (Array.isArray(slides) && slides.some(s => !!s.mapImage));
-      if (hasCustomMap) {
-        return res.status(403).json({
-          message: 'Custom map screenshot upload is a Rosterly Pro feature. Upgrade to Pro to upload custom match screenshots!',
-          code: 'CUSTOM_MAP_PRO_ONLY'
         });
       }
     }
