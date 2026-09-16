@@ -5,7 +5,7 @@ const { sendTreasuryWebhook, sendMatchWebhook } = require('../utils/discordWebho
 // Deposit funds to team vault
 exports.deposit = async (req, res) => {
   try {
-    const { amount, teamId, description } = req.body;
+    const { amount, teamId, description, date } = req.body;
     const team = await Team.findOne({ _id: teamId });
     if (!team) return res.status(404).json({ message: 'Team not found' });
 
@@ -18,13 +18,16 @@ exports.deposit = async (req, res) => {
       return res.status(400).json({ message: 'Deposit amount must be a positive number greater than 0' });
     }
 
+    const txDate = date && !isNaN(new Date(date).getTime()) ? new Date(date) : new Date();
+
     team.balance = team.balance + parsedAmount;
     team.transactions.push({
       type: 'deposit',
       amount: parsedAmount,
       description: description ? description.trim() : 'Manual Deposit',
       performedBy: req.userId,
-      status: 'completed'
+      status: 'completed',
+      date: txDate
     });
 
     await team.save();
@@ -45,7 +48,7 @@ exports.deposit = async (req, res) => {
 // Withdraw funds from team vault
 exports.withdraw = async (req, res) => {
   try {
-    const { amount, teamId, description } = req.body;
+    const { amount, teamId, description, date } = req.body;
     const team = await Team.findOne({ _id: teamId });
     if (!team) return res.status(404).json({ message: 'Team not found' });
 
@@ -62,13 +65,16 @@ exports.withdraw = async (req, res) => {
       return res.status(400).json({ message: 'Insufficient funds in squad treasury' });
     }
 
+    const txDate = date && !isNaN(new Date(date).getTime()) ? new Date(date) : new Date();
+
     team.balance -= parsedAmount;
     team.transactions.push({
       type: 'withdraw',
       amount: parsedAmount,
       description,
       performedBy: req.userId,
-      status: 'completed'
+      status: 'completed',
+      date: txDate
     });
 
     await team.save();
@@ -89,7 +95,7 @@ exports.withdraw = async (req, res) => {
 // Record competitive match lobby (pending or completed)
 exports.recordLobby = async (req, res) => {
   try {
-    const { teamId, entryFee, profit, description, status } = req.body;
+    const { teamId, entryFee, profit, description, status, date } = req.body;
     const team = await Team.findOne({ _id: teamId });
     if (!team) return res.status(404).json({ message: 'Team not found' });
 
@@ -97,13 +103,16 @@ exports.recordLobby = async (req, res) => {
       return res.status(403).json({ message: 'Only team captain or co-captains can record match stakes' });
     }
 
+    const txDate = date && !isNaN(new Date(date).getTime()) ? new Date(date) : new Date();
+
     team.transactions.push({
       type: 'lobby',
       entryFee: Number(entryFee || 0),
       description,
       performedBy: req.userId,
       profit: Number(profit || 0),
-      status: status || 'pending'
+      status: status || 'pending',
+      date: txDate
     });
 
     await team.save();
@@ -131,7 +140,7 @@ exports.recordLobby = async (req, res) => {
 // Settle pending match lobby reward and reconcile net profit
 exports.settleLobby = async (req, res) => {
   try {
-    const { teamId, profit, entryFee } = req.body;
+    const { teamId, profit, entryFee, date } = req.body;
     const { transactionId } = req.params;
 
     const team = await Team.findOne({ _id: teamId });
@@ -147,6 +156,10 @@ exports.settleLobby = async (req, res) => {
     transaction.profit = Number(profit);
     transaction.status = 'completed';
     transaction.entryFee = Number(entryFee);
+
+    if (date && !isNaN(new Date(date).getTime())) {
+      transaction.date = new Date(date);
+    }
 
     team.balance = team.balance + (Number(profit) - Number(entryFee));
     await team.save();
@@ -193,7 +206,7 @@ exports.deleteTransaction = async (req, res) => {
 // Edit an existing transaction record (adjusts balance only for the delta of amount corrections)
 exports.editTransaction = async (req, res) => {
   try {
-    const { teamId, amount, description, entryFee, profit, status, recipientName } = req.body;
+    const { teamId, amount, description, entryFee, profit, status, recipientName, date } = req.body;
     const { transactionId } = req.params;
 
     const team = await Team.findOne({ _id: teamId });
@@ -255,6 +268,12 @@ exports.editTransaction = async (req, res) => {
     }
     if (recipientName !== undefined) {
       transaction.recipientName = recipientName.trim();
+    }
+    if (date !== undefined) {
+      const parsedDate = new Date(date);
+      if (!isNaN(parsedDate.getTime())) {
+        transaction.date = parsedDate;
+      }
     }
 
     await team.save();

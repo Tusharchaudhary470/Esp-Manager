@@ -5,7 +5,7 @@ const { sendPayoutWebhook } = require('../utils/discordWebhook');
 // Record player payout from squad vault
 exports.recordPayout = async (req, res) => {
   try {
-    const { teamId, amount, userId, description, recipientName } = req.body;
+    const { teamId, amount, userId, description, recipientName, date } = req.body;
     const team = await Team.findOne({ _id: teamId });
     if (!team) return res.status(404).json({ message: 'Team not found' });
 
@@ -22,6 +22,8 @@ exports.recordPayout = async (req, res) => {
       return res.status(400).json({ message: 'Insufficient balance in squad vault' });
     }
 
+    const txDate = date && !isNaN(new Date(date).getTime()) ? new Date(date) : new Date();
+
     team.balance -= payoutAmount;
     team.transactions.push({
       type: 'payout',
@@ -30,7 +32,8 @@ exports.recordPayout = async (req, res) => {
       recipientName,
       description,
       performedBy: req.userId,
-      status: 'completed'
+      status: 'completed',
+      date: txDate
     });
 
     await team.save();
