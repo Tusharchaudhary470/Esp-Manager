@@ -2,6 +2,19 @@ const Team = require('../models/Team');
 const { canWrite } = require('../middleware/permissions');
 const { sendTreasuryWebhook, sendMatchWebhook } = require('../utils/discordWebhook');
 
+// Helper to parse dates without losing hours/minutes or defaulting to 5:30 AM IST (00:00 UTC)
+const parseTransactionDate = (date, fallbackDate = null) => {
+  if (!date) return new Date();
+  if (typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    // If only YYYY-MM-DD was sent, preserve fallback time or use current local time
+    const base = fallbackDate && !isNaN(new Date(fallbackDate).getTime()) ? new Date(fallbackDate) : new Date();
+    const [y, m, d] = date.split('-').map(Number);
+    return new Date(y, m - 1, d, base.getHours(), base.getMinutes(), base.getSeconds());
+  }
+  const parsed = new Date(date);
+  return isNaN(parsed.getTime()) ? new Date() : parsed;
+};
+
 // Deposit funds to team vault
 exports.deposit = async (req, res) => {
   try {
@@ -18,7 +31,7 @@ exports.deposit = async (req, res) => {
       return res.status(400).json({ message: 'Deposit amount must be a positive number greater than 0' });
     }
 
-    const txDate = date && !isNaN(new Date(date).getTime()) ? new Date(date) : new Date();
+    const txDate = parseTransactionDate(date);
 
     team.balance = team.balance + parsedAmount;
     team.transactions.push({
@@ -27,7 +40,8 @@ exports.deposit = async (req, res) => {
       description: description ? description.trim() : 'Manual Deposit',
       performedBy: req.userId,
       status: 'completed',
-      date: txDate
+      date: txDate,
+      updatedAt: new Date()
     });
 
     await team.save();
@@ -65,7 +79,7 @@ exports.withdraw = async (req, res) => {
       return res.status(400).json({ message: 'Insufficient funds in squad treasury' });
     }
 
-    const txDate = date && !isNaN(new Date(date).getTime()) ? new Date(date) : new Date();
+    const txDate = parseTransactionDate(date);
 
     team.balance -= parsedAmount;
     team.transactions.push({
@@ -74,7 +88,8 @@ exports.withdraw = async (req, res) => {
       description,
       performedBy: req.userId,
       status: 'completed',
-      date: txDate
+      date: txDate,
+      updatedAt: new Date()
     });
 
     await team.save();
@@ -103,7 +118,7 @@ exports.recordLobby = async (req, res) => {
       return res.status(403).json({ message: 'Only team captain or co-captains can record match stakes' });
     }
 
-    const txDate = date && !isNaN(new Date(date).getTime()) ? new Date(date) : new Date();
+    const txDate = parseTransactionDate(date);
 
     team.transactions.push({
       type: 'lobby',
@@ -112,7 +127,8 @@ exports.recordLobby = async (req, res) => {
       performedBy: req.userId,
       profit: Number(profit || 0),
       status: status || 'pending',
-      date: txDate
+      date: txDate,
+      updatedAt: new Date()
     });
 
     await team.save();
@@ -270,11 +286,9 @@ exports.editTransaction = async (req, res) => {
       transaction.recipientName = recipientName.trim();
     }
     if (date !== undefined) {
-      const parsedDate = new Date(date);
-      if (!isNaN(parsedDate.getTime())) {
-        transaction.date = parsedDate;
-      }
+      transaction.date = parseTransactionDate(date, transaction.date);
     }
+    transaction.updatedAt = new Date();
 
     await team.save();
     res.json({ message: 'Transaction updated successfully', transaction, Balance: team.balance });

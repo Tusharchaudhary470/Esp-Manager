@@ -10,7 +10,8 @@ const transactionSchema = new mongoose.Schema({
   status: { type: String, enum: ['pending', 'completed'], default: 'pending' },
   paidTo: { type: mongoose.Schema.Types.Mixed },
   recipientName: { type: String },
-  date: { type: Date, default: Date.now }
+  date: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now }
 });
 
 const tournamentLineupSchema = new mongoose.Schema({
